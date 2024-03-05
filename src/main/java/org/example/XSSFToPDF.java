@@ -72,7 +72,7 @@ public class XSSFToPDF {
                     // Saving the file
                     String ext = xssfPictureData.suggestFileExtension();
                     byte[] data = xssfPictureData.getData();
-                    String filePath = "/Users/o_dung_quoc.p/Work/excel-file-java/image1.png";
+                    String filePath = "D:/Projects/excel-file-java/image1.png";
                     try (FileOutputStream os = new FileOutputStream(filePath)) {
                         os.write(data);
                         os.flush();
@@ -207,7 +207,7 @@ public class XSSFToPDF {
 
 
     public static void main(String[] args) throws DocumentException, IOException {
-        String excelFilePath = "src/main/resources/Book1.xlsx";
+        String excelFilePath = "src/main/resources/Book1_Win.xlsx";
         String pdfFilePath = "src/main/resources/pdfsample.pdf";
         convertExcelToPDF(excelFilePath, pdfFilePath);
     }
