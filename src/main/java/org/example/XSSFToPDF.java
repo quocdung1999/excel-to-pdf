@@ -6,25 +6,22 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 
+import com.lowagie.text.*;
+import com.lowagie.text.Font;
+import com.lowagie.text.pdf.RGBColor;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.*;
 
-import com.itextpdf.text.BaseColor;
-import com.itextpdf.text.Document;
-import com.itextpdf.text.DocumentException;
-import com.itextpdf.text.Element;
-import com.itextpdf.text.Font;
-import com.itextpdf.text.Paragraph;
-import com.itextpdf.text.Phrase;
-import com.itextpdf.text.pdf.PdfPCell;
-import com.itextpdf.text.pdf.PdfPTable;
-import com.itextpdf.text.pdf.PdfWriter;
+import com.lowagie.text.pdf.PdfPCell;
+import com.lowagie.text.pdf.PdfPTable;
+import com.lowagie.text.pdf.PdfWriter;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.openxmlformats.schemas.drawingml.x2006.spreadsheetDrawing.CTPicture;
 
-import static org.apache.poi.util.Units.EMU_PER_PIXEL;
+import static org.apache.poi.util.Units.*;
 
 
 public class XSSFToPDF {
@@ -52,11 +49,12 @@ public class XSSFToPDF {
         for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
             Sheet worksheet = workbook.getSheetAt(i);
             int rowCount = worksheet.getPhysicalNumberOfRows();
+            Check(worksheet,0,0);
             // Add header with sheet name as title
-            Paragraph title = new Paragraph(worksheet.getSheetName(), new Font(Font.FontFamily.HELVETICA, 18, Font.BOLD));
+            Paragraph title = new Paragraph(worksheet.getSheetName(), new Font(Font.HELVETICA, 18, Font.BOLD));
 //            System.out.println("Last row number: " + worksheet.getLastRowNum());
 //            System.out.println("First row number: " + worksheet.getTopRow());
-
+            //System.out.println("Row 10: " + worksheet.get);
             XSSFDrawing drawing = (XSSFDrawing) worksheet.createDrawingPatriarch(); // I know it is ugly, actually you get the actual instance here
             for (XSSFShape shape : drawing.getShapes()) {
                 if (shape instanceof XSSFPicture picture) {
@@ -66,17 +64,17 @@ public class XSSFToPDF {
                     int row2 = anchor.getRow2();
                     int col1 = anchor.getCol1();
                     int col2 = anchor.getCol2();
-                    System.out.println("Row1: " + row1 + " Row2: " + row2);
-                    System.out.println("Column1: " + col1 + " Column2: " + col2);
-                    System.out.println(anchor.getDx1()/EMU_PER_PIXEL + " " +  anchor.getDx2()/EMU_PER_PIXEL + " " + anchor.getDy1()/EMU_PER_PIXEL + " " + anchor.getDy2()/EMU_PER_PIXEL);
+//                    System.out.println("Row1: " + row1 + " Row2: " + row2);
+//                    System.out.println("Column1: " + col1 + " Column2: " + col2);
+//                    System.out.println(anchor.getDx1()/EMU_PER_PIXEL + " " +  anchor.getDx2()/EMU_PER_PIXEL + " " + anchor.getDy1()/EMU_PER_PIXEL + " " + anchor.getDy2()/EMU_PER_PIXEL);
                     // Saving the file
                     String ext = xssfPictureData.suggestFileExtension();
                     byte[] data = xssfPictureData.getData();
-                    String filePath = "/Users/o_dung_quoc.p/Work/excel-file-java/image1.png";
-                    try (FileOutputStream os = new FileOutputStream(filePath)) {
-                        os.write(data);
-                        os.flush();
-                    }
+//                    String filePath = "/Users/o_dung_quoc.p/Work/excel-file-java/image1.png";
+//                    try (FileOutputStream os = new FileOutputStream(filePath)) {
+//                        os.write(data);
+//                        os.flush();
+//                    }
 
                 }
             }
@@ -132,13 +130,14 @@ public class XSSFToPDF {
     private static void addTableData(Sheet worksheet, PdfPTable table) throws DocumentException, IOException {
         for (Row row : worksheet) {
             int currIndex = 0;
+
             for (int i = 0; i < row.getPhysicalNumberOfCells(); currIndex++) {
                 Cell cell = row.getCell(currIndex);
                 //System.out.println(row.getRowNum()+ ","+ currIndex);
                 PdfPCell cellPdf = null;
                 if (cell != null) {
                     String cellValue = getCellText(cell);
-                    cellPdf = new PdfPCell(new Phrase(cellValue, util.getCellStyle(cell)));
+                    cellPdf = new PdfPCell(new Phrase(cellValue, getCellStyle(cell)));
                     setBackgroundColor(cell, cellPdf);
                     setCellAlignment(cell, cellPdf);
                     i++;
@@ -160,7 +159,7 @@ public class XSSFToPDF {
             if (bgColor != null) {
                 byte[] rgb = bgColor.getRGB();
                 if (rgb != null && rgb.length == 3) {
-                    cellPdf.setBackgroundColor(new BaseColor(rgb[0] & 0xFF, rgb[1] & 0xFF, rgb[2] & 0xFF));
+                    cellPdf.setBackgroundColor(new RGBColor(rgb[0] & 0xFF, rgb[1] & 0xFF, rgb[2] & 0xFF));
                 }
             }
         }
@@ -202,6 +201,72 @@ public class XSSFToPDF {
                 cellPdf.setVerticalAlignment(Element.ALIGN_BOTTOM);
                 break;
         }
+    }
+
+
+    public static Font getCellStyle(Cell cell) throws DocumentException, IOException {
+        //System.out.println("NOT NULL: "+ cell.getRowIndex() +"," +cell.getColumnIndex());
+        Font font = new Font();
+        CellStyle cellStyle = cell.getCellStyle();
+        org.apache.poi.ss.usermodel.Font cellFont = cell.getSheet()
+                .getWorkbook()
+                .getFontAt(cellStyle.getFontIndex());
+
+
+        short fontColorIndex = cellFont.getColor();
+        if (fontColorIndex != IndexedColors.AUTOMATIC.getIndex() && cellFont instanceof XSSFFont) {
+            XSSFColor fontColor = ((XSSFFont) cellFont).getXSSFColor();
+            if (fontColor != null) {
+                byte[] rgb = fontColor.getRGB();
+                if (rgb != null && rgb.length == 3) {
+                    // System.out.println((rgb[0] & 0xFF) + " " + (rgb[1] & 0xFF) + " " + (rgb[2] & 0xFF));
+                    font.setColor(new RGBColor(rgb[0] & 0xFF, rgb[1] & 0xFF, rgb[2] & 0xFF));
+                }
+            }
+        }
+
+
+        if (cellFont.getItalic()) {
+            font.setStyle(Font.ITALIC);
+        }
+
+        if (cellFont.getStrikeout()) {
+            font.setStyle(Font.STRIKETHRU);
+        }
+
+        if (cellFont.getUnderline() == 1) {
+            font.setStyle(Font.UNDERLINE);
+        }
+
+        short fontSize = cellFont.getFontHeightInPoints();
+        font.setSize(fontSize);
+
+        if (cellFont.getBold()) {
+            font.setStyle(Font.BOLD);
+        }
+
+        String fontName = cellFont.getFontName();
+        if (FontFactory.isRegistered(fontName)) {
+            font.setFamily(fontName); // Use extracted font family if supported by iText
+        } else {
+            //logger.warn("Unsupported font type: {}", fontName);
+            // - Use a fallback font (e.g., Helvetica)
+            font.setFamily("Helvetica");
+        }
+
+        return font;
+    }
+
+    public static void Check(Sheet worksheet, int pageHeight, int pageWidth) {
+        int rowCount = worksheet.getPhysicalNumberOfRows();
+        System.out.println(worksheet.getDefaultRowHeightInPoints());
+        for (int i = 0; i < worksheet.getLastRowNum(); i++) {
+            Row row = worksheet.getRow(i);
+            if (row == null) {
+
+            }
+        }
+
     }
 
 
