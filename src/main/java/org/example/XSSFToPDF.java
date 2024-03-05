@@ -87,7 +87,7 @@ public class XSSFToPDF {
                         maxRow = row2;
                     }
                     if (col2 > maxCol) {
-                        maxRow = row2;
+                        maxCol = col2;
                     }
                 }
             }
@@ -122,11 +122,11 @@ public class XSSFToPDF {
             float totalP = 0;
             for (int c = currCol;; c++) {
 ;
-                if (totalP + colsWidth[c] > document.getPageSize().getWidth()) {
+                if (totalP + colsWidth[c] > document.getPageSize().getWidth() || c == maxCol) {
                     createTable(sheet, document, maxRow, currCol, c - 1, totalP);
                     currCol = c;
                     break;
-                } else {
+                } else{
                     totalP += colsWidth[c];
                 }
             }
@@ -334,7 +334,7 @@ public class XSSFToPDF {
     }
 
     public static void main(String[] args) throws DocumentException, IOException {
-        String excelFilePath = "src/main/resources/Book1.xlsx";
+        String excelFilePath = "src/main/resources/Book1_Win.xlsx";
         String pdfFilePath = "src/main/resources/pdfsample.pdf";
         convertExcelToPDF(excelFilePath, pdfFilePath);
     }
