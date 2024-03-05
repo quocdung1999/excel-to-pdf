@@ -10,7 +10,7 @@ public class util {
         return height * EMU_PER_CHARACTER / 20.0  / EMU_PER_PIXEL;
     }
 
-    public static double pointsToPixels(float point) {
-        return point * 1.0 * EMU_PER_POINT / EMU_PER_PIXEL;
+    public static float pointsToPixels(float point) {
+        return (float) (point * 1.0 * EMU_PER_POINT / EMU_PER_PIXEL);
     }
 }
