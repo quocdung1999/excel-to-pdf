@@ -11,15 +11,11 @@ import java.util.Map;
 import com.lowagie.text.*;
 import com.lowagie.text.Font;
 import com.lowagie.text.Rectangle;
-import com.lowagie.text.pdf.RGBColor;
+import com.lowagie.text.pdf.*;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.*;
-
-import com.lowagie.text.pdf.PdfPCell;
-import com.lowagie.text.pdf.PdfPTable;
-import com.lowagie.text.pdf.PdfWriter;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -48,7 +44,6 @@ public class XSSFToPDF {
     public static void convertExcelToPDF(String excelFilePath, String pdfFilePath) throws IOException, DocumentException {
         Workbook workbook = readExcelFile(excelFilePath);
         Document document = createPDFDocument(pdfFilePath);
-        System.out.println(document.getPageSize().getHeight());
         int maxCol = 0;
         int maxRow = 0;
         for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
@@ -115,26 +110,27 @@ public class XSSFToPDF {
     }
 
     private static void setupTables(Sheet sheet, Document document, int maxRow, int maxCol) throws DocumentException, IOException {
-
+        float margin = 36;
         int currCol = 0;
 
         while (currCol != maxCol) {
-            float totalP = 0;
+            float totalPixelWidth = 0;
             for (int c = currCol;; c++) {
 ;
-                if (totalP + colsWidth[c] > document.getPageSize().getWidth() || c == maxCol) {
-                    createTable(sheet, document, maxRow, currCol, c - 1, totalP);
+                if (totalPixelWidth + colsWidth[c] > document.getPageSize().getWidth() || c == maxCol) {
+                    if (c == maxRow) {
+                        createTable(sheet, document, maxRow, currCol, c , totalPixelWidth);
+                    } else {
+                        createTable(sheet, document, maxRow, currCol, c - 1 , totalPixelWidth);
+                    }
+
                     currCol = c;
                     break;
                 } else{
-                    totalP += colsWidth[c];
+                    totalPixelWidth += colsWidth[c];
                 }
             }
-
         }
-
-
-
     }
 
     private static void initData(Sheet sheet, int maxRow, int maxCol) {
@@ -147,27 +143,34 @@ public class XSSFToPDF {
         for (int i = 0; i <= maxRow;i++) {
             Row row = sheet.getRow(i);
             if (row == null) {
-                rowsHeight[i] = util.pointsToPixels(sheet.getDefaultRowHeightInPoints());
+                rowsHeight[i] = sheet.getDefaultRowHeightInPoints();
             } else {
-                rowsHeight[i] = util.pointsToPixels(row.getHeightInPoints());
+                rowsHeight[i] = row.getHeightInPoints();
             }
         }
     }
 
 
-    public static String getCellText(Cell cell) {
-        String cellValue;
+    public static String getCellText(Cell cell, CellType type) {
+        String cellValue = "";
         if (cell == null) {
             return "";
         }
-        switch (cell.getCellType()) {
+        switch (type) {
             case STRING:
                 cellValue = cell.getStringCellValue();
                 break;
             case NUMERIC:
-                cellValue = String.valueOf(BigDecimal.valueOf(cell.getNumericCellValue()));
+                double value = cell.getNumericCellValue();
+                if (Math.floor(value) == value || Math.ceil(value) == value) {
+                    cellValue = String.valueOf((long) value);
+                } else {
+                    cellValue = String.valueOf(value);
+                }
+
                 break;
-            case BLANK:
+            case FORMULA:
+                return getCellText(cell, cell.getCachedFormulaResultType());
             default:
                 cellValue = "";
                 break;
@@ -175,14 +178,15 @@ public class XSSFToPDF {
         return cellValue;
     }
 
-    private static void createTable(Sheet sheet, Document document, int maxRow, int currentCol, int maxCol, float totalWidth) throws DocumentException, IOException {
-
+    private static void createTable(Sheet sheet, Document document, int maxRow, int startCol, int endCol, float totalWidth) throws DocumentException, IOException {
 
         PdfPTable table = new PdfPTable(1);
         //table.setWidthPercentage(totalWidth/595);
-        table.setWidthPercentage(100);
+        table.setTotalWidth(totalWidth);
+        table.setHorizontalAlignment(Element.ALIGN_LEFT);
+        //table.
         table.getDefaultCell().setBorder(Rectangle.NO_BORDER);
-
+        System.out.println(0+" "+maxRow +" "+startCol+" "+ endCol);
         for (int currRow = 0; currRow <= maxRow ; currRow++) {
             Row row = sheet.getRow(currRow);
             if (row == null) {
@@ -191,21 +195,22 @@ public class XSSFToPDF {
                 cell.setFixedHeight(rowsHeight[currRow]);
                 table.addCell(cell);
             } else {
-                System.out.println(currentCol+" "+ maxCol+ " "+ currRow+" "+maxRow);
-                PdfPTable nested = new PdfPTable(maxCol - currentCol + 1);
+
+                PdfPTable nested = new PdfPTable(endCol - startCol + 1);
 
                 //Set width
 
-                float[] widths = Arrays.copyOfRange(colsWidth, currentCol, maxCol+1);
+                float[] widths = Arrays.copyOfRange(colsWidth, startCol, endCol+1);
                 nested.setWidths(widths);
                 //int currIndex = 0;
-                for (int currCol = currentCol; currCol <= maxCol; currCol++) {
+                for (int currCol = startCol; currCol <= endCol; currCol++) {
                     Cell cell = row.getCell(currCol);
 
                     //System.out.println(row.getRowNum()+ ","+ currIndex);
                     PdfPCell cellPdf = null;
                     if (cell != null) {
-                        String cellValue = getCellText(cell);
+                        CellType type = cell.getCellType();
+                        String cellValue = getCellText(cell, type);
                         cellPdf = new PdfPCell(new Phrase(cellValue, getCellStyle(cell)));
                         setBackgroundColor(cell, cellPdf);
                         setCellAlignment(cell, cellPdf);
@@ -216,14 +221,30 @@ public class XSSFToPDF {
                     cellPdf.setFixedHeight(rowsHeight[currRow]);
                     cellPdf.setBorder(Rectangle.NO_BORDER);
                     nested.addCell(cellPdf);
+
                 }
                 table.addCell(nested);
+
             }
         }
 
-
         document.add(table);
         document.newPage();
+
+//        XSSFDrawing drawing = (XSSFDrawing) sheet.createDrawingPatriarch(); // I know it is ugly, actually you get the actual instance here
+//        for (XSSFShape shape : drawing.getShapes()) {
+//            if (shape instanceof XSSFPicture picture) {
+//                XSSFPictureData xssfPictureData = picture.getPictureData();
+//                ClientAnchor anchor = picture.getPreferredSize();
+//                if (anchor.getCol1() <= maxCol) {
+//                    byte[] data = xssfPictureData.getData();
+//                    Image image = Image.getInstance(data);
+//                    image.setAbsolutePosition(0,840);
+//                    document.add(image);
+//                }
+//            }
+//        }
+        //document.newPage();
     }
 
     private static void setBackgroundColor(Cell cell, PdfPCell cellPdf) {
@@ -236,6 +257,8 @@ public class XSSFToPDF {
             if (bgColor != null) {
                 byte[] rgb = bgColor.getRGB();
                 if (rgb != null && rgb.length == 3) {
+                    cellPdf.setBackgroundColor(new RGBColor(rgb[0] & 0xFF, rgb[1] & 0xFF, rgb[2] & 0xFF));
+                } else if (rgb != null) {
                     cellPdf.setBackgroundColor(new RGBColor(rgb[0] & 0xFF, rgb[1] & 0xFF, rgb[2] & 0xFF));
                 }
             }
@@ -303,8 +326,21 @@ public class XSSFToPDF {
         }
 
 
-        if (cellFont.getItalic()) {
-            font.setStyle(Font.ITALIC);
+
+
+        short fontSize = cellFont.getFontHeightInPoints();
+        font.setSize(fontSize);
+
+        if (cellFont.getBold()) {
+            if (cellFont.getItalic()) {
+                font.setStyle(Font.BOLDITALIC);
+            } else {
+                font.setStyle(Font.BOLD);
+            }
+        } else {
+            if (cellFont.getItalic()) {
+                font.setStyle(Font.ITALIC);
+            }
         }
 
         if (cellFont.getStrikeout()) {
@@ -313,13 +349,6 @@ public class XSSFToPDF {
 
         if (cellFont.getUnderline() == 1) {
             font.setStyle(Font.UNDERLINE);
-        }
-
-        short fontSize = cellFont.getFontHeightInPoints();
-        font.setSize(fontSize);
-
-        if (cellFont.getBold()) {
-            font.setStyle(Font.BOLD);
         }
 
         String fontName = cellFont.getFontName();
@@ -335,7 +364,7 @@ public class XSSFToPDF {
     }
 
     public static void main(String[] args) throws DocumentException, IOException {
-        String excelFilePath = "src/main/resources/Book1_Win.xlsx";
+        String excelFilePath = "src/main/resources/excelsample.xlsx";
         String pdfFilePath = "src/main/resources/pdfsample.pdf";
         convertExcelToPDF(excelFilePath, pdfFilePath);
     }
