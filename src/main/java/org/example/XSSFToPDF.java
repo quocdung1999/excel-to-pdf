@@ -181,6 +181,7 @@ public class XSSFToPDF {
         PdfPTable table = new PdfPTable(1);
         //table.setWidthPercentage(totalWidth/595);
         table.setWidthPercentage(100);
+        table.getDefaultCell().setBorder(Rectangle.NO_BORDER);
 
         for (int currRow = 0; currRow <= maxRow ; currRow++) {
             Row row = sheet.getRow(currRow);
